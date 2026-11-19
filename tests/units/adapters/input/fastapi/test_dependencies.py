@@ -12,11 +12,10 @@ async def test_inject_tenant_uri_without_auth():
     request = MagicMock(spec=Request)
     request.headers = {}
     
-    # Import here to avoid config loading issues
-    from adapters.input.fastapi.dependencies import inject_tenant_uri
-    
-    # Should not raise
-    await inject_tenant_uri(request)
+    with patch("adapters.input.fastapi.dependencies._get_inject_fn", return_value=AsyncMock()) as factory:
+        from adapters.input.fastapi.dependencies import inject_tenant_uri
+        await inject_tenant_uri(request)
+    factory.return_value.assert_awaited_once_with(request)
 
 
 async def test_inject_tenant_uri_is_cached():
@@ -49,7 +48,8 @@ def test_require_auth_fn_is_cached():
         mock_config.return_value = mock_cfg
         
         # Clear cache first
-        from adapters.input.fastapi.dependencies import _get_require_auth_fn
+        from adapters.input.fastapi.dependencies import _get_config, _get_require_auth_fn
+        _get_config.cache_clear()
         _get_require_auth_fn.cache_clear()
         
         fn1 = _get_require_auth_fn()
@@ -89,10 +89,13 @@ def test_require_auth_raises_without_keycloak_config():
         mock_config.return_value = mock_cfg
         
         # Clear cache
-        from adapters.input.fastapi.dependencies import _get_require_auth_fn
+        from adapters.input.fastapi.dependencies import _get_config, _get_require_auth_fn
+        _get_config.cache_clear()
         _get_require_auth_fn.cache_clear()
         
         with pytest.raises(RuntimeError, match="config.keycloak requis"):
             _get_require_auth_fn()
+        _get_config.cache_clear()
+        _get_require_auth_fn.cache_clear()
 
 
